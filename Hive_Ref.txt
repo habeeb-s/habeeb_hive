@@ -1,0 +1,841 @@
+1. creating DataBase
+
+   CREATE DATABASE habeeb.db 
+   COMMENT "personal house expenditure tables"
+   LOCATION '/user/cloudera/habbeb_dbs/'
+   WITH DBPROPERTIES( 'Author' = 'habeeb', 'date' = '2019-08-27 13:17:44'); 
+
+   SHOW DATABASES; -- list of all databases in hive/Database;
+
+
+   To display the current working Database Directory we should set the configurtion as follows :
+   hive>   set hive.cli.print.current.db=true;
+
+   USE <database_name>;
+ex: use siva_db;
+
+
+    DROP DATABASE siva_db;
+
+    DESCRIBE DATABASE <db_name>;  - partial details
+    DESCRIBE DATABASE EXTENDED <db_name>   - Full details
+
+
+2. TABLE 
+
+CREATE TABLE employee_data 
+(eid TINYINT COMMENT 'refers id of the employee MAIN KEY', 
+ename STRING,
+DOJ STRING,
+Mngr STRING,
+dept_no TINYINT,
+dept_name STRING,
+sal FLOAT,
+comm FLOAT) 
+COMMENT 'Complete Employee Information.....'
+ROW FORMAT DELIMITED
+FIELDS TERMINATED BY '|'
+STORED AS TEXTFILE;
+
+
+
+29/8/2019
+
+-- Managed Table    /user/hive/warehouse     hive.user.warehouse.dir
+
+
+OCTAL CODE   /001 = ^A       /002      /003                                        DEMILITERS = SEPARATOR B/W 2 OR MORE VALUES EX:  6 -->  , | \t : \001 \002 \003
+                                                                                                                                                     ^A   ^B   ^C
+
+AJITH	45000	RAVI|SASI|SUMITH	LIC=2250|PF=800|STAX=125.5	BALJI NAGAR|NELLORE|AP|524002
+
+
+
+# Table # 1
+
+create table newemp(ename STRING,salary FLOAT,subordinates ARRAY<STRING>,deductions MAP<STRING, FLOAT>,address STRUCT<street:STRING, city:STRING, city:STRING, zip:INT>)
+
+ROW FORMAT DELIMITED
+FIELDS TERMINATED '\t'
+COLLECTION ITEMS TERMINATED BY '|'
+MAP KEYS TERMINATED BY '='
+LINES TERMINATED BY '\n'
+STORED AS TEXTFILE;
+
+# Loading data into a Table FIle
+2 ways  :   
+1. Local file system  -  load data local inpath '/home/cloudera/Sivafiles/newemp_data.txt' overwrite into table newemp;
+2. HDFS               -   load data inpath '/user/cloudera/emp' into table newemp;
+
+
+for newemp table, we are loading data from LFS as follows:
+load data local inpath '/home/cloudera/Sivafiles/newemp_data.txt' overwrite into table newemp;
+
+
+
+# Table #2
+
+INFOSYS,INFY,2345,2234,2759,2134,12
+
+create external table siva_tables.stocks(company string, tikcer string,open_price INT,close_price INT,mid_high int,mid_lov int,volume smallint) 
+comment 'Share indices of BSE' 
+row format delimited 
+fields terminated by ',' 
+lines terminated by '\n' 
+stored as textfile
+location '/user/cloudera/siva_db/'
+with tblproperties("author" = "sivakumar", "purpose" = "stocks analaysis");
+
+
+Loading data from HDFS : load data inpath '/user/cloudera/stocks_data.txt' overwrite into table stocks;
+
+
+# Working with Hive queries in CLI directly.....
+  for a SIngle Query line cityment, use  hive -e "select * from newemp;"
+
+  for processing multiple HQL queries that are stored in a file, use, hive -f "filename.hql" 
+
+
+
+
+10-9-2019
+
+***************    PARTITIONS    *************************
+
+
+APJOBS   --     LOT OF STUDENTS - DIFFERNT POSTS -- DIFF DISTRICT - DIFF CITIES/TOWNS
+
+A APPLICANT FROM -- NELLORE TOWN --- NLR DISTRICT(NLR,KAVALI,NPETA,S PETA,ETC)  - AP    diffERNT FROM other DISTRICTS (PRAKASAM,CHITTOR,KADAPA.......)
+
+
+
+select name, gender, place, job_applied from apjobs where ditrict="nellore" and city="nellore"
+ Data formats in Hadoop:
+
+TextInputFormat
+KeyValueInputFormat
+SequenceFileInputFormat
+SequenceFileAsTextInputFormat
+
+But, we have Differnt FIle Formats to store the above Type of Data
+Textfile, sequence file(key,value) , avro file, parquets...........(textfile)  (only working with webservers)
+
+Compression Formats --  .LZO,.GZIP,.SNAPPY .......
+
+
+
+create table emp_main(eid smallint,ename string,desg string,mgr smallint,doj string,sal float,comm float,deptno tinyint) row format delimited fields terminated by ',' lines terminated by '\n' stored as sequencefile;
+
+
+eg:    emp.seq
+  
+   'eid' = '7890'
+   'name' = 'siva'
+   'desg' = 'clerk'
+   'mgr'= '7654'
+   'sal' = '234560'
+   'comm' = 'NULL'
+   'deptno' = '10'
+
+
+
+   'eid' = '7890'
+   'name' = 'siva'
+   'desg' = 'clerk'
+   'mgr'= '7654'
+   'sal' = '234560'
+   'comm' = 'NULL'
+   'deptno' = '10'
+
+
+at the time of Declaration there is no relation with what type of partition u r creating!!!!!!.................
+
+create table emp_part(eid smallint,ename string,desg string,mgr smallint,doj string,sal float,comm float) partitioned by(deptno tinyint) 
+row format delimited fields terminated by ',' lines terminated by '\n' stored as textfile;
+
+partitions are of 2 types:   all data will be under "ONE MASTER TABLE ONLY"
+
+1. STATIC PARTITIONS  (LOAD DATA ONLY FOR GLOBAL ASSIGNMENT = ASSIGN ALL RECORDS TO A PARTICULAR SECTION(COLUMN) OF DATA BLINDLY)   -- LOading INDIVIDUAL DATA SETS(each district)
+2. DYAMNIC PARTITIONS  (CLUBBED DATA --   ASSIGN THE RECORDS AS PER SELECTION/PATTERN MATCHING - TECHNICALLY LOCAL ARRANGEMENT)     -- CONSOLIDATED DATA (all districts)
+ 
+
+NOTE : the order of columns in table creation = order of columns in input file
+
+** LOading data UNDer STATIC PARtiTIONS......(ONLY)   { works with RELATED DATA }
+
+load data local inpath '/home/cloudera/Sivafiles/mro_nlr' overwrite into table emp_part partiton (place='nlr',district='NLR');
+
+
+load data local inpath '/home/cloudera/Sivafiles/mro_gudur' overwrite into table emp_part partiton (place='gdr',district='NLR');     --    1 District (3 places)
+load data local inpath '/home/cloudera/Sivafiles/mro_kavli' overwrite into table emp_part partiton (place='kvl',district='NLR');
+
+
+load data local inpath '/home/cloudera/Sivafiles/emp' overwrite into table emp_part partiton (desg='CLERK',deptnp=20);
+
+load data local inpath '/home/cloudera/Sivafiles/emp' overwrite into table emp_part partiton (desg='MANAGER',deptnp=30);
+
+
+AIM: to Create A MASTER DATA SET CALLED "APJOBS"   (place string, district string)
+mro_nlr,mro_kavali,mro_gudur ----> NLR district      
+mro_tpt,mro_reni,mro_kala  ------->CHR district
+
+
+
+13 district - each disrt - 3 places - each place_file 5 records
+13*15 ~ 200 records
+
+
+
+
+
+*** For dynamic partition we cannot use LOAD cityment....... Because, the table itself MASTER TABLE( Reverse- engineering)
+
+# please set these configurations ON for Alias Columns and Dynamic partitions...
+
+set hive.mapreduce.mode=nonstrict;
+set hive.exec.dynamic.partition.mode=nonstrict;
+
+xyz ltd is a company it has employees in diff branches..... hyd,chennai,blr,pun,mub,sanfransisco,west virginia (cities)
+2,00,000 records....
+xyzemp_list 2L records = US
+
+seperate employees' list on the basis of cities and countries using partitions..... India, US,Canada
+
+
+{  1.static
+Mapping the entire data to desired value -- global assignment  }
+
+
+
+2.Dynamic partitions
+
+
+interms of declartion of partitions ... both static and dynamic are same;   
+
+pre-requestities:
+
+1. Master Data set(client) and Master data Table(user) or any Big table(xls document, text document)
+2. create a NEW TABLE(user) with partitions referring MASTER DATA TABLE.  Decide on which columns you should apply partitions and place them as Last Columns in the NEW TABLE.
+3. we should INSERT STATEMENT for Inserting data into dynamic table from Normal Master table.
+    
+
+create table xyzemp_list(sno smallint,eid int,ename string,job string,emptype string,doj string,basic int,hra int,da int,spl_all int,tax int,city string, country string)
+ row format delimited fields terminated by ',' lines terminated by '\n' stored as textfile;
+
+(Dynamic) Partition Table:
+create table xyzemp_dympart(sno smallint,eid int,ename string,job string,emptype string,doj string,basic int,hra int,da int,spl_all int,tax int)
+partitioned by (city string, country string)
+ row format delimited fields terminated by ',' lines terminated by '\n' stored as textfile;
+
+Full Dynamism:
+    insert overwrite table xyzemp_dympart
+    partition (city,country)
+    select e.sno,e.eid,e.ename,e.job,e.emptype,e.doj,e.basic,e.hra,e.da,e.spl_all,e.tax,e.city,e.country from xyzemp_list e;
+
+4. Order of columns is very important in terms of any partition.
+
+col1,col2,col3...col9,col10
+                   <-------- partitions works for Right to LEft........
+
+
+
+Mixed Partitions: order of priority : 1.static(parent) 2.dynamic(child)
+
+
+create table xyzemp_dympart_mum_pun(sno smallint,eid int,ename string,job string,emptype string,doj string,basic int,hra int,da int,spl_all int,tax int)
+partitioned by (city string, country string)
+ row format delimited fields terminated by ',' lines terminated by '\n' stored as textfile;
+
+
+2 types:   select <columns_list> from <table_name> where<condition>;
+
+from <table>
+selct <columns_list> where <condition>;
+
+from xyzemp_list e
+insert overwrite table xyzemp_dympart_mum_pun
+partition (city="MUMBAI",country)
+select e.sno,e.eid,e.ename,e.job,e.emptype,e.doj,e.basic,e.hra,e.da,e.spl_all,e.tax,e.country where e.city='MUMBAI'
+insert overwrite table xyzemp_dympart_mum_pun
+partition (city="PUNE",country)
+select e.sno,e.eid,e.ename,e.job,e.emptype,e.doj,e.basic,e.hra,e.da,e.spl_all,e.tax,e.country where e.city='PUNE'
+insert overwrite table xyzemp_dympart_mum_pun
+partition (city="SANFRANSISCO",country="UNITED STATES")
+select e.sno,e.eid,e.ename,e.job,e.emptype,e.doj,e.basic,e.hra,e.da,e.spl_all,e.tax where e.city='SANFRANSISCO' or e.country='UNITED STATES';
+
+
+
+
+insert overwrite local directory '/home/cloudera/Sivafiles/top_salary'              -> writes data to a local directory under 000000_0 file by default.
+select ename,sal,deptno, rank() over(order by sal desc) as Top_ranked_salaried_employees from emp_master;
+
+
+
+!cat Sivafiles/top_salary/000000_0;
+
+
+
+
+
+******   17-09-2019   ***********
+
+
+1. GROUP BY & HAVING CLAUSES:           
+
+The group by clause is used to filter the data of table which determines the frequencies of key column which is being grouped.The having clause is used to specify the 
+condition for the groped-key column or aggregate functions ONLY.
+
+
+select --------------
+from <tablename> 
+where<Cond>
+group by<key-column> 
+having <cond on grouped col>;
+ordery by  ASC/DESC;
+
+
+
+
+   select max(sal) as Max_sal from emp_master     --- e
+
+   select * from emp_master where sal = Max_sal     ------ f
+
+
+SELF JOIN:
+
+select f.* from (select max(sal) as MAX_SAL from emp_master)e, emp_master f where e.MAX_SAL = f.sal
+
+7839    KING    PRESIDENT       NULL    17-NOV-1981     5000.0  NULL    10
+
+
+
+
+From emp_master table:
+
+eg: 
+1.  select deptno from emp_master group by deptno;
+2.  select deptno,count(*) from emp_master group by deptno;
+3.  select deptno,max(sal) from emp_master group by deptno;
+4.  select sal,count(*) as Salmorethan2K from emp_master where desg<>'MANAGER' group by sal having sal > 2000;
+
+3000.0  2
+5000.0  1
+
+5. select sal,deptno,count(*) as Salmorethan2K from emp_master where desg<>'MANAGER' group by sal, deptno having sal > 2000;
+3000.0  20      2
+5000.0  10      1
+
+
+2. ORDER BY CLAUSE:  BY default 'order by' function works in ASCENDING ORDER ONLY
+
+select * from emp_master order by sal;
+select * from emp_master order by sal desc;
+select * from emp_master order by sal asc,comm asc;
+
+
+3. ROW_NUMBER()   - gives the result data with specified starting and ending positions by considering a key-column with proper order.ex: 10-15 records, 20-25 records .....
+
+
+select * from (select *, ROW_NUMBER() OVER(ORDER BY salary) as row_id from emp_master)e where e.row_id > 5 and e.row_id < 8;
+1000    chandra engg    7782    23-JAN-1982     1300.0  NULL    90      6
+7934    MILLER  CLERK   7782    23-JAN-1982     1300.0  NULL    10      7
+
+
+4. RANK() Function:
+
+Assigning Ranks on the basis of our desired column as per requirement....................
+
+select ename,sal,deptno, rank() over(order by sal desc) as Top_ranked_salaried_employees from emp_master;
+
+
+
+5. DISTINCT command:
+
+Removes repeated records in a column of a table. Used to Identify the exact entries/list in a table/column.
+
+eg: select DISTINCT desg From emp_master;
+
+desg
+
+ANALYST
+CLERK
+MANAGER
+PRESIDENT
+SALESMAN
+engg
+
+
+
+6. Aggregate Functions in HIVE:   ( set hive.map.aggr=true;)
+
+1. Max()
+eg: select max(sal) as Maximum_salary from emp_master;
+
+2. min()
+eg: select min(sal) as Minimum_salary from emp_master;
+
+3. Sum()
+eg: select sum(sal) as TOT_salary_paid from emp_master;
+
+4. avg()
+eg: select avg(sal) as AverageSal_Paid from emp_master;
+
+
+ EG: select max(sal) as HIGH_SAL ,min(sal) as LOW_SAL,sum(sal) as TOT_SAL, avg(sal) as AVG_SAL_PAID from newemp;
+
+
+
+
+
+7.     #   MISCLLANEOUS FUNCTIONS IN HIVE:
+
+=> TABLE GENERATING FUNCTIONS:
+
+1. Explode and posexplode
+
+'explode' funtion is used to un-nest the tuples of a column. And 'posexplode' is used to un-nest the tuples with position numbers.
+
+ select explode(subordinates) as Assistants from newemp;
+ select posexplode(subordinates) as (position,value) from newemp;
+ select explode(deductions) from newemp;
+
+ key     value            (Since this a MAP datatype, so the data will be displayed in key, value pairs)
+
+LIC     2250.0
+IT      245.23
+PF      800.0
+LIC     1200.0
+
+=> map('key1',value1,'key2',value2)
+
+This functions displays the data in MAP Type values.
+
+eg: select map('idly',20,'Dosa',25,'puri',30);
+{"idly":20,"Dosa":25,"puri":30}
+
+select explode(map('idly',20,'Dosa',25,'puri',30));
+key     value
+idly    20
+Dosa    25
+puri    30
+
+
+=> map_keys & map_values
+
+select map_keys(deductions) as deduction_names,map_values(deductions) as dedcutions_values from newemp;
+
+select explode(deductions) from newemp;
+
+
+
+=>  array()
+
+select array('siva','kumar','santhosh');
+
+
+
+=> size()
+
+select size(array('ramu','phani'));
+select size(map('apgli',1140,'lic',2344));
+
+
+=> if()
+
+select if(2*5=20,'RIGHT','WRONG');
+select if(max(salary)>200000,'RIGHT','WRONG') from newemp;
+select if(max(salary)>200000,'RIGHT','WRONG'),max(salary) as MAX from newemp;
+
+
+
+=> coalesce - returns the first not null value amoung the null values..
+
+select coalesce(null,null,12,null,23);
+select coalesce(null,null,12,34,23);
+
+=>ascii()
+
+select ascii('A');
+
+=> decode()
+
+select decode(unhex(hex(97)),'US-ASCII');
+
+
+=> concat()
+select concat(ename,'+',desg) from emp_master;
+select concat(ename,'is working as ',desg) from emp_master;
+
+insert overwrite local directory '/home/cloudera/emp_brief'
+    >  select concat(ename,' salary in company is ',sal,' working under deptno ',deptno,' reporting to manager ',mgr,' working as ',desg) from emp_master;
+
+
+
+=>concat_ws()
+select concat_ws('=',ename,sal) from emp_master;
+
+
+=>Find_in_set
+
+select find_in_set('SIVA',ename) from emp_master;  => Returns the index number(position number);
+select find_in_set('hard','ramu,is,working,so,hard,in,his,profession');
+
+select find_in_set('JAMES',ename),row_number() over(order by ename asc) as ROW_NO from emp_master;
+
+
+=>length()
+select length(ename) from emp_master;
+
+=> lcase() or lower()
+
+select lcase(ename) from emp_master;
+
+
+=> ucase() or upper()
+select upper(ename) from emp_master;
+
+
+=>lpad() & rpad()
+select lpad(ename,20,'*') from emp_master;
+select rpad(ename,30,'+') from emp_master;
+
+=>space(n) = display n no.of space between string/columns
+ EG: select ename,space(30),sal,space(30),desg from emp_master;
+ 
+
+=> repeat() & reverse()
+
+select repeat(enmae,3) from emp_master;
+select reverse(ename) from emp_master;  -  PALNIDROME EX: MADAM,MALAYALAM
+
+
+=>substring()
+
+select substring('hi how are you? how about a movie today?',10,20);
+
+
+
+
+26-9-2019
+
+********************  JOINS  (MATCHING) **********************************
+
+
+1. INNER JOIN/NATURAL JOIN/JOIN     ==   returns all matched records from 2 tables  (INTERSECTION-- A?B)
+
+deptno in emp_master - 10  20 30 90
+deptno in Dept       - 10 20 30 40
+
+
+ select e.ename,e.desg,e.sal,e.deptno,d.deptno,d.dept_name,d.dept_loc from emp_master e join dept d on e.deptno=d.deptno;
+
+ select e.ename,e.desg,e.sal,e.deptno,d.deptno,d.dept_name,d.dept_loc from emp_master e join dept d on e.deptno=d.deptno where e.sal>2000;
+
+
+2. LEFT OUTER JOIN    --  Returns all records(both matched & Unmatched) from Left queried table w.r.to Matched records(ONLY) from Right Queried table. Those records which
+                       doesnot have match in right side table will show NULL values w.r.t Left table.(A?(A?B))
+
+select e.ename,e.desg,e.sal,e.deptno,d.deptno,d.dept_name,d.dept_loc from emp_master e left outer join dept d on e.deptno=d.deptno;
+
+
+chandra engg    1300.0  90      NULL    NULL    NULL
+
+
+3. RIGHT OUTER JOIN  --  Returns only MATCHED records from LEFT side Table and ALL records From RIGHT SIDE TABLE.((A?B)?B)
+
+select e.ename,e.desg,e.sal,e.deptno,d.deptno,d.dept_name,d.dept_loc from emp_master e right outer join dept d on e.deptno=d.deptno;
+
+NULL    NULL    NULL    NULL    40      OPERATIONS      BOSTON
+
+
+4. FULL OUTER JOIN  --   Returns ALL records (Matched and unmatched) from BOTH RIGHT & LEFT TABLES  --  (A?B)
+
+select e.ename,e.desg,e.sal,e.deptno,d.deptno,d.dept_name,d.dept_loc from emp_master e full outer join dept d on e.deptno=d.deptno;
+
+NULL    NULL    NULL    NULL    40      OPERATIONS      BOSTON
+chandra engg    1300.0  90      NULL    NULL    NULL
+
+
+5. CARTESIAN PRODUCT    --    Returns all records in MULTIPLES (AXB) -- MANY to MANY relations --  DOESNOT follow MATCHING .....
+
+  select * from emp_master join dept;
+
+Total records of TABLE emp_master = 15
+Total records of TABLE  dept     = 4;
+resutl  = 15 X 4 =  60 records
+
+
+6.  left semi join/self-join  -  This is specially used for retrieving matched records of TABLE by JOINING with ITSELF -- SELF JOIN.
+
+ select e.eid,e.ename,e.desg,e.mgr from emp_master e left semi join emp_master f on e.eid=f.mgr;
+
+
+TRUE SENSE of clubbing :
+
+RIGHT SEMI JOIN - select e.eid,m.mgr,e.ename,m.ename from emp_master e right semi join emp_master m on e.mgr=m.eid;( HIVE DOESNOT SUPPORT)
+                  
+NOrmal style    -  select e.eid,m.mgr,e.ename,m.ename from emp_master e,emp_master m where e.mgr=m.eid;
+
+
+
+
+29-09-2019
+
+
+I) SORT BY COMMAND:
+
+ORDER BY : Display / Arrange the contents in a column in particular order either ASC/ DESC . 
+
+The Conceptual Difference :    ORDER BY : GLOBAL ARRANGING ( REDUCER ) 
+
+ex: select * from emp_master order by salary ASC, comm DESC;   = This order by applies logic of Order on the given columnns at SAME TIME with reference to the TABLE data.
+
+ex 2: select ename,desg,sal from emp_master order by sal DESC;
+
+Time taken: 62.595 seconds, Fetched: 15 row(s)
+
+
+
+In contrast, SORY BY acts as COMBINER ....... (LOCAL ARRANGING)
+
+ex: select * from emp_master sort by salary ASC, comm DESC;
+                                      combiner 1,  combiner 2,  combiner 3,.......................
+                         
+      combiner 1 - Arranges Salary in ASC order (Local ARRANGEMENT)        Happens Individually.....
+
+
+      combiner 2 - Arranges Comm in DESC order.....
+
+
+ex 2:  select ename,desg,sal from emp_master sort by sal DESC;
+
+Time taken: 39.232 seconds, Fetched: 15 row(s)
+
+
+
+II) DISTRIBUTE BY Command:
+
+In reference to GROUP BY Command: THIS CALLS for GLOBAL ARRANGING......(REDUCER)
+select exch,symbol,month(date) from NYSE_stocks group by date,exch,symbol;
+
+Time taken: 39.968 seconds, Fetched: 222 row(s)
+
+
+
+But, DISTRIBUTE BY calls for PATITIONERS........(LOCAL SEGGREGATION)
+ex:  select exch,symbol,date,avg_price from NYSE_stocks distribute by month(date);
+
+Time taken: 36.186 seconds, Fetched: 222 row(s)
+
+
+
+
+
+III) CLUSTERED BY & BUCKETING....(SAMPLING TECHNIQUE)
+
+To Enable BUcketing concept in hive, we should do the following:
+
+1. set hive.enforce.bucketing=true;
+2. create a normal table which refers the Bucket table.
+3. create Bucket table with same columns and datatypes of referring table.
+
+
+Normal Table:
+ create table customers_buckets(cid smallint,cus_name string,age tinyint,city string,income float)  
+ row format delimited 
+ fields terminated by '\t' 
+ stored as textfile;
+
+
+BUCKET TABLE:
+
+ create table customers_buckets(cid smallint,cus_name string,age tinyint,city string,income float) 
+ comment "bucket table" 
+ clustered by(cid) into 5 buckets 
+ row format delimited 
+ fields terminated by '\t' 
+ stored as textfile;
+
+LOADING DATA INTO BUCKET TABLE:
+
+insert overwrite table customers_buckets select * from customers_normal;
+
+
+RETRIEVING DATA FROM BUCKET TABLE:
+
+ select * from customers_buckets TABLESAMPLE(BUCKET 1 OUT OF 5 ON cid)s;
+ select * from customers_buckets TABLESAMPLE(BUCKET 2 OUT OF 5 ON cid)s;
+ select * from customers_buckets TABLESAMPLE(BUCKET 3 OUT OF 5 ON cid)s;
+ select * from customers_buckets TABLESAMPLE(BUCKET 4 OUT OF 5 ON cid)s;
+ select * from customers_buckets TABLESAMPLE(BUCKET 5 OUT OF 5 ON cid)s;
+
+
+INTERNAL FRAGMENTATION OF BUCKEING IN HDFS:
+
+-rwxr-xr-x   1 cloudera cloudera         96 2019-09-29 00:23 /user/cloudera/siva_db/customers_buckets/000000_0
+-rwxr-xr-x   1 cloudera cloudera         90 2019-09-29 00:20 /user/cloudera/siva_db/customers_buckets/000001_0
+-rwxr-xr-x   1 cloudera cloudera         91 2019-09-29 00:20 /user/cloudera/siva_db/customers_buckets/000002_0
+-rwxr-xr-x   1 cloudera cloudera         95 2019-09-29 00:20 /user/cloudera/siva_db/customers_buckets/000003_0
+-rwxr-xr-x   1 cloudera cloudera         96 2019-09-29 00:20 /user/cloudera/siva_db/customers_buckets/000004_0
+
+
+
+
+USe of Sampling: The importance of keyword 'TABLESAMPLE'      ( IRRESPECTIVE OF ANY TABLE)
+
+ select * from customers_buckets tablesample(50 percent)s;  (for a BUCKET table)
+
+ select * from NYSE_stocks tablesample(20 percent)s;  (NOrmal Table)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+       
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+NORMAL TABLE
+create table sivaemp_data(sno int,eid int,ename string,job string,emptype string,doj string,basic int,hra int,da int,spl_all int,tax int,city string,country string)
+row format delimited
+fields terminated by ','
+lines terminated by '\n'
+stored as textfile;
+
+DYNAMIC TABLE
+
+create table sivaemp_dympart_hyd_chen(sno int,eid int,ename string,job string,emptype string,doj string,basic int,hra int,da int,spl_all int,tax int)
+partitioned by(city string,country string)
+row format delimited
+fields terminated by ','
+lines terminated by '\n'
+stored as textfile;
+
+Full DYNAMISM:
+
+from sivaemp_data e
+insert overwrite table sivaemp_dympart
+partition(city,country)
+select e.sno,e.eid,e.ename,e.job,e.emptype,e.doj,e.basic,e.hra,e.da,e.spl_all,e.tax,e.city,e.country;
+
+
+Mixed Partitions (Both Static & Dynamic)
+
+
+
+from sivaemp_data e 
+insert overwrite table sivaemp_dympart_us_can
+partition(city='SANFRANSISCO',country)
+select e.sno,e.eid,e.ename,e.job,e.emptype,e.doj,e.basic,e.hra,e.da,e.spl_all,e.tax,e.country where e.city='SANFRANSISCO'
+insert overwrite table sivaemp_dympart_us_can
+partition(city='WEST VIRGINIA',country)
+select e.sno,e.eid,e.ename,e.job,e.emptype,e.doj,e.basic,e.hra,e.da,e.spl_all,e.tax,e.country where e.city='WEST VIRGINIA';	'
+
+
+NOTE : The static partition keys must come before the dynamic partition keys AND column names from importing table should not have STATIC COLUMN ( SINCE ITS ALREAY
+EXISTS IN WHERE CLAUSE') 
+[Error 10094]: Line 3:10 Dynamic partition cannot be the parent of a static partition ''UNITED STATES''
+
+
+
+GENERAL INSERT STATEMENTS : Inserting data from one table to another table without partitions and even exporting a table data to our defined directory.
+
+from sivaemp_data e
+insert overwrite table sivaemp_contractlist
+select e.* where e.emptype='CONTRACT';
+
+
+from siveemp_data e
+insert overwrite table sivaemp_offshore
+select e.* where country in('UNITED STATES','CANADA');
+
+
+from sivaemp_data e
+insert overwrite table sivaemp_lowsal_highsal
+select e.sno,e.eid,e.ename,e.job,e.emptype,e.doj,e.basic,e.hra,e.da,e.spl_all,e.tax,e.city,e.country where e.basic <= 30000 or e.basic >= 100000;
+
+
+
+
+
+
+
+
+
+   
+   
